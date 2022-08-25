@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es-ES">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Page to detect equal creole proverbs from an array and convert them to a corresponding json</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+    <script src="consts.js"></script>
+</head>
+<body>
+    <header class="container pt-5">
+            <h1 class="text-center">The result data</h1>
+    </header>
+    <main>
+        <div id="app">
+            <section class="container pt-4">
+                <textarea v-model="objectFilteredSecondString" style="width: 100%;" rows="20">
+                </textarea>
+            </section>
+        </div>
+    </main>
+
+
+    <script type="text/javascript">
+
+
+        const ajaxCall = function (url) {
+
+            return new Promise((resolve, reject) => {
+
+                // The url object
+                try {
+                    // Make the ajax call
+                    var xhttp = new XMLHttpRequest();
+                    xhttp.onreadystatechange = function () {
+                        if (this.readyState == 4 && this.status == 200) {
+                            resolve(JSON.parse(this.responseText));
+                        } else if (this.readyState == 4) {
+                            reject("An error has occurred, please try again later")
+                        }
+                    };
+                    xhttp.open("GET", url, true);
+                    xhttp.send();
+
+                } catch (error) {
+                    reject("An error has occurred: ", error.toString())
+                }
+            })
+        }
+
+
+        // Vue app search
+        var app = new Vue({
+            delimiters: ['${', '}'],
+            el: '#app',
+            data: {
+                // The proverbs list
+                api_url: "https://example.com", // Api Url, change for a real url
+                data: [],
+                objectFiltered: [],
+                objectFilteredSecond: [],
+                objectFilteredFinal: [],
+                objectFilteredSecondString: "", // String to set the textarea value
+                equalOrdered: []
+            },
+            // Mounted vue method
+            mounted: function mounted() {
+                // A copy of this
+                var self = this;
+                
+                // Get the data from url
+                ajaxCall(self.api_url).then(data => {
+                    self.data = data
+                    
+                    // Start to transform the creole list on page load
+                    self.workData(self.data);
+
+                }, error => {
+                    // Get the data from default place
+                    self.data = data_default
+
+                    // Start to transform the creole list on page load
+                    self.workData(self.data);
+                })
+
+
+
+            },
+            methods: {
+
+                /**
+                 * Function to replace special characters in a input text for "normal" characters and fix common creole syntaxis mistakes
+                 * @param string, String to replace special characters
+                 * @return string, Text with the characters changed
+                 */
+                slugify: function slugify(string) {
+                    const a = 'àkáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìłḿñńǹňôöòóœøōõṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:;"'
+                    const b = 'acaaaaaaaaacccddeeeeeeeegghiiiiiilmnnnnooooooooprrsssssttuuuuuuuuuwxyyzzz-------'
+                    const p = new RegExp(a.split('').join('|'), 'g')
+    
+                    return string.toString().toLowerCase()
+                        // .replace(/\s+/g, '-') // Replace spaces with -
+                        .replace(p, function (c) { return b.charAt(a.indexOf(c)) }) // Replace special characters
+                        .replace(/&/g, ' and ') // Replace & with 'and'
+                        .replace(/^-+/, '') // Trim - from start of text
+                        .replace(/-+$/, '') // Trim - from end of text
+                        .replace(/\-\-*/g, '\r') // Replace & with ' '
+                        .replace(/\-\-+/g, '\r') // Replace multiple - with single -
+                        .replace(/[^\w\-\ ]+/g, '') // Remove all non-word characters
+                },
+
+                /**
+                 * Function to replace special characters in a input text for "normal" characters and fix common creol syntaxis mistakes
+                 * @param data, Array of texts to replace special characters
+                 * @return string
+                 */
+                workData: function workData(data) {
+
+                    var self = this;
+
+                    // set new var with the transformed cleaned texts
+                    var newData = Object.assign([], self.cleanJson(data));
+
+                    self.objectFiltered = [];
+
+                    // Start to filter data from the cleaned array
+                    self.filterData(newData, function () {
+                        // Set the final array object with the unique founded proverbs, 
+                        // the n times founded proverbs
+                        // A array with the duplicated alternatives of each proverb
+                        self.objectFilteredFinal = self.objectFilteredSecond.map(e => {
+                            return {
+                                text: self.data[e.pos[0]],
+                                ntimes: e.ntimes, 
+                                otherOptions: e.pos.map(el => self.data[el])
+                            }
+                        })
+                        // Convert the final array object data into string (and "print" this into the textarea)
+                        self.objectFilteredSecondString = JSON.stringify(self.objectFilteredFinal);
+                    });
+
+                    return self.objectFilteredSecondString;
+                },
+
+                /**
+                 * Function to clean the input array data
+                 * @param data, Array of texts to replace special characters
+                 * @return Array with the proverbs "cleaned"
+                 */
+                cleanJson: function cleanJson(data) {
+                    var self = this;
+                    // Replace all text characters and transform these into lowercase
+                    var newData = data.map(item => self.slugify(item.toLowerCase()));
+                    return newData;
+                },
+
+                /**
+                 * Function to find duplicated proverbs
+                 * @param data, Array of texts
+                 * @param callback, Function to call after the function
+                 */
+                filterData: function filterData(data, callback) {
+                    var self = this;
+                    var pos = 1;
+
+                    var finded = false;
+                    var nFiltPos = 0;
+
+                    // Search for equal items, check some proverbs with a simple method
+                    data.forEach((element, i) => {
+
+                        nFiltPos = 0;
+                        finded = false;
+
+                        while (nFiltPos < self.objectFiltered.length && finded == false) {
+                            
+                            if (self.checkEqual(element, self.objectFiltered[nFiltPos].text)) {
+                                finded = true;
+                                self.objectFiltered[nFiltPos].ntimes += 1;
+                                self.objectFiltered[nFiltPos].pos = [...self.objectFiltered[nFiltPos].pos, i];
+                            }
+                            nFiltPos ++;
+                        }
+
+                        // Add the current proverb like new proverb
+                        if (!finded) {
+                            self.objectFiltered.push(new Object({
+                                pos: [i],
+                                text: element,
+                                ntimes: 1
+                            }));
+                        }
+                        1
+                    });
+
+                    self.equalOrdered = Object.assign([], self.objectFiltered);
+
+                    // Search for similar items, search for repeated words with a complex method
+                    self.equalOrdered.forEach((element, i) => {
+
+                        nFiltPos = 0;
+                        finded = false;
+
+                        while (nFiltPos < self.objectFilteredSecond.length && finded == false) {
+
+                            if (self.checkSimilar(element.text, self.objectFilteredSecond[nFiltPos].text)) {
+                                finded = true;
+                                self.objectFilteredSecond[nFiltPos].ntimes += element.ntimes;
+                                self.objectFilteredSecond[nFiltPos].pos = [...element.pos, ...self.objectFilteredSecond[nFiltPos].pos];
+                            }
+                            nFiltPos++;
+                        }
+
+                        if (!finded) {
+                            self.objectFilteredSecond.push(element);
+                        }
+
+                    });
+
+                    // Function to execute after the filter process has been executed
+                    callback();
+                },
+
+                /**
+                 * Function to check if two strings are equal
+                 * @param string1, string 1
+                 * @param string2, string 1
+                 */
+                checkEqual: function checkEqual(string1, string2) {
+                    
+                    if (string1 == string2) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                },
+
+                /**
+                 * Function to check if two strings are similar (The proverbs are the same with syntaxis errors)
+                 * @param string1, string 1
+                 * @param string2, string 1
+                 * @return bool if the strings are equal or not
+                 */
+                checkSimilar: function checkSimilar(string1, string2) {
+                    
+                    // Convert both proverbs into an array of words
+                    let arrSwords1 = string1.split(" ");
+                    let arrSwords2 = string2.split(" ");
+
+                    // Start the differents requerimets to detect if the proverbs are the same 
+                    // 1. Check if the string lengths are very similar to continue
+                    // 2. Check if the relevants sword are the same in the same order
+                    // 3. Check if the cosine of relevant words founded are enought
+                    // 4. Check if the words founded in other position are enought
+                    // 5. Check if the words founded in other position have a min percent and some words are breaken in other words
+                    // 6. Check for words that exist in the differets "not founded words" that could be the same word
+                    if (Math.abs(string1.length - string2.length) / ((string1.length + string2.length) / 2 ) < cosineLength) {
+                        
+
+                        // Set an array with the words that have more of 2 characters
+                        // It's necessary to compare the most relevant words to set the compare algorithm exacter
+                        let cleanedArr1 = arrSwords1.filter(e => {
+                            if (e.length > 2) {
+                                return true;
+                            }
+                        })
+    
+                        let cleanedArr2 = arrSwords2.filter(e => {
+                            if (e.length > 2) {
+                                return true;
+                            }
+                        })
+
+                        // Check if the relevants sword are the same in the same order 
+                        if (JSON.stringify(cleanedArr1) === JSON.stringify(cleanedArr2)) {
+
+                            return true;
+
+                        } else {
+
+                            // Found all relevant sword finded in the both proverbs 
+                            let finded = cleanedArr1.filter((e, index) => {
+                                if (e === cleanedArr2[index]) {
+                                    return true;
+                                }
+                            });
+
+                            // Check if the cosine of relevant words founded are enought
+                            if ((cleanedArr1.length - finded.length) / ((cleanedArr1.length + cleanedArr2.length) / 2) < cosineFoundedWordsLength) {
+                                
+                                return true;
+
+                            } else {
+
+                                // Get the not founded words from proverb 1
+                                let notFinded = cleanedArr1.filter((e, index) => {
+                                    if (e !== cleanedArr2[index]) {
+                                        return true;
+                                    }
+                                });
+
+                                if (notFinded.length > 0) {
+                                    // Check the words founded in other position
+                                    let includedOtherPosition = notFinded.filter((e, index) => {
+                                        if (cleanedArr2.includes(e)) {
+                                            return true;
+                                        }
+                                    });
+                                    
+                                    // Check if the words founded in other position are enought
+                                    if ((notFinded.length - includedOtherPosition.length) / (notFinded.length) < cosineFoundedWordsOtherPos) {
+
+                                        return true;
+                                       
+                                    // Check if the words founded in other position are at least 0.5 percent
+                                    } else if ((notFinded.length - includedOtherPosition.length) / (notFinded.length) < cosineFoundedWordsOtherPosElseFilter) {
+
+                                        // Check if the words founded in other position have a min percent and some words are breaken in other words
+                                        let nIncludes = 0;
+
+                                        for (let index = 0; index < cleanedArr1.length - 1; index++) {
+                                            nIncludes = cleanedArr2.includes(cleanedArr1[index] + cleanedArr1[index + 1]) ? nIncludes + 1 : nIncludes;
+                                        }
+                                        
+                                        for (let index = 0; index < cleanedArr2.length - 1; index++) {
+                                            nIncludes = cleanedArr1.includes(cleanedArr2[index] + cleanedArr2[index + 1]) ? nIncludes + 1 : nIncludes;
+                                        }
+
+                                        if (nIncludes > 0) {
+
+                                            return true;
+
+                                        } else {
+
+                                            // The array of not finded proverbs of string 2
+                                            let difference = cleanedArr2.filter(x => !cleanedArr1.includes(x));
+
+                                            let findedLettersRepeat = 0;
+
+                                            // Search for words that exist in the differets "not founded words" that could be the same word
+                                            notFinded.forEach((e, i) => {
+                                                difference.forEach((de, id) => {
+                                                    // Check if the words have similar a size
+                                                    if ((e.length - de.length) < 2) {
+                                                        // Get the chars not founded in both words
+                                                        let elem = e.split('').filter(x => !de.split('').includes(x));
+                                                        // if all letters less 1 are in both swords, set like the same or similar word
+                                                        if (elem.length < 2) {
+                                                            findedLettersRepeat ++;
+                                                        }
+                                                    }
+                                                })
+                                            });
+                                            // If has been founded 1 or more words are the same, return true
+                                            if (findedLettersRepeat > 0) {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // default result (not equal)
+                    return false;
+                }
+            },
+        })
+
+    </script>
+
+</body>
+
+</html>
