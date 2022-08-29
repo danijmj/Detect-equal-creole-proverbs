@@ -14,7 +14,7 @@ Page to detect equal creole proverbs from an array and convert them to a corresp
 
 ## Usage
 
-For use, you need change the propierty 'api_url' in vue data params, and point to a json array of proverbs in a external resource (doing a 'GET' request). Then the result will be printed like json object array into the textarea.
+For use, you need change the property 'api_url' in vue data params, and point to a json array of proverbs in a external resource (doing a 'GET' request). Then the results will be printed like a object array json into the textarea.
 
 
 <br>
